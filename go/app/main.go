@@ -10,10 +10,12 @@ import (
 	"io/ioutil"
 	"strconv"
 	"crypto/sha256"
+	"database/sql"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -26,6 +28,8 @@ type Item struct {
 	Category string `json:"category"`
 	Image string `json:"image"`
 }
+
+var db *sql.DB
 
 type Items struct {
 	Items []Item `json:"items"`
@@ -61,6 +65,31 @@ func dataJson() Items{
 	return beforeItems
 }
 
+func dbData() Items{
+	//Making the db request
+    rows, err := db.Query("SELECT name, category_id, image_filename FROM mercari.Items;")
+    if err != nil {
+        //log.Fatal(err)
+		fmt.Println(err)
+    }
+    defer rows.Close()
+
+	var allItems Items
+
+    for rows.Next() {
+		item := Item{}
+        err = rows.Scan(&item.Name, &item.Category, &item.Image)
+		
+        if err != nil {
+            //log.Fatal(err)
+			fmt.Println(err)
+        }
+		allItems.Items = append(allItems.Items, item)
+	}
+
+	return allItems
+}
+
 func addItem(c echo.Context) error {
 	//Get form data
 	name := c.FormValue("name")
@@ -83,7 +112,7 @@ func addItem(c echo.Context) error {
 	newItem.Category = category
 	newItem.Image = newImageName
 
-	items := dataJson()
+	items := dbData()
 
 	//Add new 
 	items.Items = append(items.Items, newItem)
@@ -102,12 +131,6 @@ func addItem(c echo.Context) error {
 }
 
 func getImg(c echo.Context) error {
-	//sha256
-	// s := "sha256 this string"
-    // h := sha256.New()
-    // h.Write([]byte(s))
-    // bs := h.Sum(nil)
-	
 	// Create image path
 	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
 
@@ -123,7 +146,7 @@ func getImg(c echo.Context) error {
 }
 
 func getAllItems(c echo.Context) error {
-	items := dataJson()
+	items := dbData()
 	return c.JSON(http.StatusOK, items)
 }
 
@@ -157,6 +180,17 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Logger.SetLevel(log.INFO)
+
+	//Connect to the db
+	db, err := sql.Open("sqlite3", "../db/mercari.db")
+    // if err != nil {
+    //     log.Fatal(err)
+    // }
+    // defer db.Close()
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
 
 	front_url := os.Getenv("FRONT_URL")
 	if front_url == "" {
