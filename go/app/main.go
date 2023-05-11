@@ -20,7 +20,7 @@ const (
 	ImgDir = "images"
 )
 
-//Create structure for items
+//Item represents new object item
 type Item struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
@@ -40,7 +40,7 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func dataJson() Items{
+func dataJson() (Items, error){
 	//Open our jsonFile
 	jsonFile, err := os.Open("items.json")
 	if err != nil {
@@ -50,15 +50,21 @@ func dataJson() Items{
 	defer jsonFile.Close()
 
 	//Read our opened jsonFile as a byte array.
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		fmt.Println(err)
+	}
+	
 	//Inicialize our array of items
 	var beforeItems Items
 
 	//Save data into the array
-	json.Unmarshal(byteValue, &beforeItems)
+	err = json.Unmarshal(byteValue, &beforeItems)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	return beforeItems
+	return beforeItems, err
 }
 
 func addItem(c echo.Context) error {
@@ -67,7 +73,10 @@ func addItem(c echo.Context) error {
 	category := c.FormValue("category")
 	imagePath := c.FormValue("image")
 	//Read the data of the image
-	imageData, _ := ioutil.ReadFile(imagePath)
+	imageData, err := ioutil.ReadFile(imagePath)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	//Create new image name with sha256
     newImageName := fmt.Sprintf("%x%s", sha256.Sum256(imageData), ".jpg")
@@ -83,7 +92,10 @@ func addItem(c echo.Context) error {
 	newItem.Category = category
 	newItem.Image = newImageName
 
-	items := dataJson()
+	items, err := dataJson()
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	//Add new 
 	items.Items = append(items.Items, newItem)
@@ -102,12 +114,6 @@ func addItem(c echo.Context) error {
 }
 
 func getImg(c echo.Context) error {
-	//sha256
-	// s := "sha256 this string"
-    // h := sha256.New()
-    // h.Write([]byte(s))
-    // bs := h.Sum(nil)
-	
 	// Create image path
 	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
 
@@ -123,12 +129,18 @@ func getImg(c echo.Context) error {
 }
 
 func getAllItems(c echo.Context) error {
-	items := dataJson()
+	items, err := dataJson()
+	if err != nil {
+		fmt.Println(err)
+	}
 	return c.JSON(http.StatusOK, items)
 }
 
 func getItem(c echo.Context) error {
-	items := dataJson()
+	items, err := dataJson()
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	//Get the parameter
 	idParm := c.Param("id")
@@ -140,9 +152,9 @@ func getItem(c echo.Context) error {
 
 	//Search for the id
 	SelectedItem := Item{}
-	for i := 0; i < len(items.Items); i++ {
-		if(i==id){
-			SelectedItem = items.Items[i]
+	for index, element := range items.Items {
+		if(index==id){
+			SelectedItem = element
 			return c.JSON(http.StatusOK, SelectedItem)
 		}
 	}
