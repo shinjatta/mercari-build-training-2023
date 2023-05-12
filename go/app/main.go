@@ -1,34 +1,82 @@
 package main
 
 import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
-	"strings"
-	"encoding/json"
-	"io/ioutil"
 	"strconv"
-	"crypto/sha256"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
 	ImgDir = "images"
 )
 
+//DB references to the database so do not have to create it over and over again
+//Copied this from the video but I think I am not using it, I am maintaining it for the time being but I will delete if not used
+type DB struct {
+	Database *sql.DB
+}
+
 //Item represents new object item
 type Item struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
-	Image string `json:"image"`
+	Image    string `json:"image"`
 }
 
 type Items struct {
 	Items []Item `json:"items"`
+}
+
+func prepareDB() {
+	database, _ := sql.Open("sqlite3", "../../db/mercari.db")
+	statement, _ := database.Prepare(`
+	CREATE TABLE IF NOT EXISTS Category (
+		id INT PRIMARY KEY,
+		name VARCHAR(255) NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS Items (
+		id INT PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		category_id INT NOT NULL,
+		image_filename TEXT,
+		FOREIGN KEY (category_id) REFERENCES Category(id)
+	);
+	`)
+	statement.Exec()
+}
+
+func dbData() (Item, error) {
+	prepareDB()
+	d, _ := sql.Open("sqlite3", "../../db/mercari.db")
+	rows, err := d.Query("SELECT name, category_id, image_filename FROM mercari.Items;")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		item := Item{}
+		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+		if err != nil {
+			return Item{}, nil
+		}
+		return Item{}, nil
+	}
+
+	err = rows.Err()
+	return Item{}, err
 }
 
 type Response struct {
@@ -40,7 +88,7 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func dataJson() (Items, error){
+func dataJson() (Items, error) {
 	//Open our jsonFile
 	jsonFile, err := os.Open("items.json")
 	if err != nil {
@@ -54,7 +102,7 @@ func dataJson() (Items, error){
 	if err != nil {
 		fmt.Println(err)
 	}
-	
+
 	//Inicialize our array of items
 	var beforeItems Items
 
@@ -79,13 +127,13 @@ func addItem(c echo.Context) error {
 	}
 
 	//Create new image name with sha256
-    newImageName := fmt.Sprintf("%x%s", sha256.Sum256(imageData), ".jpg")
+	newImageName := fmt.Sprintf("%x%s", sha256.Sum256(imageData), ".jpg")
 
 	//Message
 	c.Logger().Infof("We recived a %s from category: %s", name, category)
 	message := fmt.Sprintf("We recived a %s from category: %s", name, category)
 	res := Response{Message: message}
-	
+
 	//Create new item
 	newItem := Item{}
 	newItem.Name = name
@@ -97,7 +145,7 @@ func addItem(c echo.Context) error {
 		fmt.Println(err)
 	}
 
-	//Add new 
+	//Add new
 	items.Items = append(items.Items, newItem)
 
 	//Save into a JSON file
@@ -129,7 +177,7 @@ func getImg(c echo.Context) error {
 }
 
 func getAllItems(c echo.Context) error {
-	items, err := dataJson()
+	items, err := dbData()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -153,7 +201,7 @@ func getItem(c echo.Context) error {
 	//Search for the id
 	SelectedItem := Item{}
 	for index, element := range items.Items {
-		if(index==id){
+		if index == id {
 			SelectedItem = element
 			return c.JSON(http.StatusOK, SelectedItem)
 		}
@@ -179,6 +227,8 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
 	}))
 
+	// database := mercari.DB{}
+	// database.InitDB()
 
 	// Routes
 	e.GET("/", root)
@@ -186,7 +236,6 @@ func main() {
 	e.GET("/items/:id", getItem)
 	e.POST("/items", addItem)
 	e.GET("/image/:imageFilename", getImg)
-
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
