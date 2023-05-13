@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -22,12 +21,6 @@ const (
 	ImgDir = "images"
 )
 
-//DB references to the database so do not have to create it over and over again
-//Copied this from the video but I think I am not using it, I am maintaining it for the time being but I will delete if not used
-type DB struct {
-	Database *sql.DB
-}
-
 //Item represents new object item
 type Item struct {
 	Name     string `json:"name"`
@@ -39,8 +32,15 @@ type Items struct {
 	Items []Item `json:"items"`
 }
 
+type Response struct {
+	Message string `json:"message"`
+}
+
 func prepareDB() {
-	database, _ := sql.Open("sqlite3", "../../db/mercari.db")
+	database, err := sql.Open("sqlite3", "mercari.db")
+	if err != nil {
+		log.Fatal(err)
+	}
 	statement, _ := database.Prepare(`
 	CREATE TABLE IF NOT EXISTS Category (
 		id INT PRIMARY KEY,
@@ -57,62 +57,42 @@ func prepareDB() {
 	statement.Exec()
 }
 
-func dbData() (Item, error) {
+func dbData() ([]Item, error) {
 	prepareDB()
-	d, _ := sql.Open("sqlite3", "../../db/mercari.db")
-	rows, err := d.Query("SELECT name, category_id, image_filename FROM mercari.Items;")
+	d, err := sql.Open("sqlite3", "mercari.db")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
+	}
+	//Query to get the information from both the Category table and the Items table
+	rows, err := d.Query(`SELECT Items.name, Category.name, Items.image_filename 
+	FROM Items
+	INNER JOIN Category
+	ON Category.id = Items.category_id`)
+	if err != nil {
+		log.Fatal(err)
 	}
 	defer rows.Close()
 
+	//Create an struct slice to put all the items recived
+	allItems := []Item{}
+
+	//Iterate over the results and scan the values in the item structs
 	for rows.Next() {
 		item := Item{}
 		err := rows.Scan(&item.Name, &item.Category, &item.Image)
 		if err != nil {
-			return Item{}, nil
+			log.Fatal(err)
 		}
-		return Item{}, nil
+		allItems = append(allItems, item)
 	}
 
 	err = rows.Err()
-	return Item{}, err
-}
-
-type Response struct {
-	Message string `json:"message"`
+	return allItems, err
 }
 
 func root(c echo.Context) error {
 	res := Response{Message: "Hello, world!"}
 	return c.JSON(http.StatusOK, res)
-}
-
-func dataJson() (Items, error) {
-	//Open our jsonFile
-	jsonFile, err := os.Open("items.json")
-	if err != nil {
-		fmt.Println(err)
-	}
-	//Defer the closing of our jsonFile so that we can parse it later on
-	defer jsonFile.Close()
-
-	//Read our opened jsonFile as a byte array.
-	byteValue, err := ioutil.ReadAll(jsonFile)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	//Inicialize our array of items
-	var beforeItems Items
-
-	//Save data into the array
-	err = json.Unmarshal(byteValue, &beforeItems)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	return beforeItems, err
 }
 
 func addItem(c echo.Context) error {
@@ -134,26 +114,36 @@ func addItem(c echo.Context) error {
 	message := fmt.Sprintf("We recived a %s from category: %s", name, category)
 	res := Response{Message: message}
 
-	//Create new item
-	newItem := Item{}
-	newItem.Name = name
-	newItem.Category = category
-	newItem.Image = newImageName
-
-	items, err := dataJson()
+	prepareDB()
+	database, err := sql.Open("sqlite3", "mercari.db")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
-	//Add new
-	items.Items = append(items.Items, newItem)
-
-	//Save into a JSON file
-	content, err := json.Marshal(items)
+	//Insert the data into the database
+	statement, _ := database.Prepare("INSERT INTO `Items` (`id`, `name`, `category_id`, `image_filename`) VALUES (?, ?, ?, ?);")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
-	err = ioutil.WriteFile("items.json", content, 0644)
+	defer statement.Close()
+
+	//Getting the id corresponding to the last item
+	var itemID int
+	err = database.QueryRow("SELECT id FROM Items ORDER BY id DESC LIMIT 1").Scan(&itemID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Getting the id corresponding to the category that was given
+	var categoryID int
+	err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
+	if err != nil {
+		fmt.Println("This category does not exist")
+		log.Fatal(err)
+	}
+
+	//Execute the INSERT statement with the values
+	_, err = statement.Exec((itemID + 1), name, categoryID, newImageName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -177,6 +167,7 @@ func getImg(c echo.Context) error {
 }
 
 func getAllItems(c echo.Context) error {
+	prepareDB()
 	items, err := dbData()
 	if err != nil {
 		fmt.Println(err)
@@ -185,7 +176,7 @@ func getAllItems(c echo.Context) error {
 }
 
 func getItem(c echo.Context) error {
-	items, err := dataJson()
+	items, err := dbData()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -200,7 +191,7 @@ func getItem(c echo.Context) error {
 
 	//Search for the id
 	SelectedItem := Item{}
-	for index, element := range items.Items {
+	for index, element := range items {
 		if index == id {
 			SelectedItem = element
 			return c.JSON(http.StatusOK, SelectedItem)
@@ -226,9 +217,6 @@ func main() {
 		AllowOrigins: []string{front_url},
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
 	}))
-
-	// database := mercari.DB{}
-	// database.InitDB()
 
 	// Routes
 	e.GET("/", root)
