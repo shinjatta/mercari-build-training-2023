@@ -35,6 +35,7 @@ type Response struct {
 	Message string `json:"message"`
 }
 
+//prepareDB creates the database in case it does not exit
 func prepareDB() {
 	database, err := sql.Open("sqlite3", "mercari.db")
 	if err != nil {
@@ -59,6 +60,7 @@ func prepareDB() {
 	}
 }
 
+//dbData gets all the data for all items
 func dbData() ([]Item, error) {
 	prepareDB()
 	d, err := sql.Open("sqlite3", "mercari.db")
@@ -97,6 +99,7 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+//addItem adds a new item and if there is not the category given, creates a new one
 func addItem(c echo.Context) error {
 	//Get form data
 	name := c.FormValue("name")
@@ -150,6 +153,7 @@ func addItem(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+//addCategory is called when there is no Category when creating a new item
 func addCategory(category string) {
 	prepareDB()
 	database, err := sql.Open("sqlite3", "mercari.db")
@@ -186,6 +190,7 @@ func getImg(c echo.Context) error {
 	return c.File(imgPath)
 }
 
+//getAllItems gets all items
 func getAllItems(c echo.Context) error {
 	prepareDB()
 	items, err := dbData()
@@ -196,6 +201,7 @@ func getAllItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+//getItem gets the item with the specified id
 func getItem(c echo.Context) error {
 	//Get the parameter
 	idParm := c.Param("id")
