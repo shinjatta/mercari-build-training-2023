@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -124,34 +123,52 @@ func addItem(c echo.Context) error {
 	}
 
 	//Insert the data into the database
-	statement, err := database.Prepare("INSERT INTO `Items` (`id`, `name`, `category_id`, `image_filename`) VALUES (?, ?, ?, ?);")
+	statement, err := database.Prepare("INSERT INTO `Items` (`name`, `category_id`, `image_filename`) VALUES (?, ?, ?);")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer statement.Close()
-
-	//Getting the id corresponding to the last item
-	var itemID int
-	err = database.QueryRow("SELECT id FROM Items ORDER BY id DESC LIMIT 1").Scan(&itemID)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	//Getting the id corresponding to the category that was given
 	var categoryID int
 	err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
 	if err != nil {
 		fmt.Println("This category does not exist")
-		log.Fatal(err)
+		addCategory(category)
+		err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	//Execute the INSERT statement with the values
-	_, err = statement.Exec((itemID + 1), name, categoryID, newImageName)
+	_, err = statement.Exec(name, categoryID, newImageName)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+func addCategory(category string) {
+	prepareDB()
+	database, err := sql.Open("sqlite3", "mercari.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Insert the data into the database
+	statement, err := database.Prepare("INSERT INTO `Category` (`name`) VALUES (?);")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer statement.Close()
+
+	//Execute the INSERT statement with the values
+	_, err = statement.Exec(category)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func getImg(c echo.Context) error {
@@ -173,36 +190,38 @@ func getAllItems(c echo.Context) error {
 	prepareDB()
 	items, err := dbData()
 	if err != nil {
-		fmt.Println(err)
+		res := Response{Message: "Not found"}
+		return c.JSON(http.StatusNotFound, res)
 	}
 	return c.JSON(http.StatusOK, items)
 }
 
 func getItem(c echo.Context) error {
-	items, err := dbData()
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	//Get the parameter
 	idParm := c.Param("id")
-	id, err := strconv.Atoi(idParm)
 
+	//Prepare the database
+	prepareDB()
+	database, err := sql.Open("sqlite3", "mercari.db")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
-	//Search for the id
+	//Prepare the query
+	query := `SELECT Items.name, Category.name, Items.image_filename
+          FROM Items
+          INNER JOIN Category ON Items.category_id = Category.id
+          WHERE Items.id = ?`
+
+	//Getting the item
 	SelectedItem := Item{}
-	for index, element := range items {
-		if index == id {
-			SelectedItem = element
-			return c.JSON(http.StatusOK, SelectedItem)
-		}
+	err = database.QueryRow(query, idParm).Scan(&SelectedItem.Name, &SelectedItem.Category, &SelectedItem.Image)
+	if err != nil {
+		res := Response{Message: "Not found"}
+		return c.JSON(http.StatusNotFound, res)
 	}
-	//TODO: cambiar statusOK
-	res := Response{Message: "Not found"}
-	return c.JSON(http.StatusNotFound, res)
+
+	return c.JSON(http.StatusOK, SelectedItem)
 }
 
 func main() {
