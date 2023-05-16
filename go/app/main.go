@@ -41,7 +41,7 @@ func prepareDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	statement, _ := database.Prepare(`
+	statement, err := database.Prepare(`
 	CREATE TABLE IF NOT EXISTS Category (
 		id INT PRIMARY KEY,
 		name VARCHAR(255) NOT NULL
@@ -55,6 +55,9 @@ func prepareDB() {
 	);
 	`)
 	statement.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func dbData() ([]Item, error) {
@@ -121,7 +124,7 @@ func addItem(c echo.Context) error {
 	}
 
 	//Insert the data into the database
-	statement, _ := database.Prepare("INSERT INTO `Items` (`id`, `name`, `category_id`, `image_filename`) VALUES (?, ?, ?, ?);")
+	statement, err := database.Prepare("INSERT INTO `Items` (`id`, `name`, `category_id`, `image_filename`) VALUES (?, ?, ?, ?);")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -197,8 +200,9 @@ func getItem(c echo.Context) error {
 			return c.JSON(http.StatusOK, SelectedItem)
 		}
 	}
+	//TODO: cambiar statusOK
 	res := Response{Message: "Not found"}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusNotFound, res)
 }
 
 func main() {

@@ -1,8 +1,26 @@
-FROM alpine
+FROM golang:latest
 
-RUN addgroup -S mercari && adduser -S trainee -G mercari
-# RUN chown -R trainee:mercari /path/to/db
+# Set the working directory inside the container
+WORKDIR /go/app
 
-USER trainee
+# Copy the go.mod and go.sum files to the container
+COPY go.mod go.sum ./
 
-CMD ["go", "version"]
+# Copy the database to the container
+COPY mercari.db ./
+
+# Set the target architecture for cross-compilation
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+# Download and cache Go dependencies
+RUN go mod download
+
+# Copy the source code into the container
+COPY ./app ./
+
+# Build the Go application
+RUN go build -o main
+
+# Set the command to run the Go application
+CMD ["./main"]
