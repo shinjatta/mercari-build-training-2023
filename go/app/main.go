@@ -54,10 +54,11 @@ func prepareDB() {
 		FOREIGN KEY (category_id) REFERENCES Category(id)
 	);
 	`)
-	statement.Exec()
 	if err != nil {
 		log.Fatal(err)
 	}
+	statement.Exec()
+	defer database.Close()
 }
 
 //dbData gets all the data for all items
@@ -125,6 +126,8 @@ func addItem(c echo.Context) error {
 		log.Fatal(err)
 	}
 
+	defer database.Close()
+
 	//Insert the data into the database
 	statement, err := database.Prepare("INSERT INTO `Items` (`name`, `category_id`, `image_filename`) VALUES (?, ?, ?);")
 	if err != nil {
@@ -133,15 +136,15 @@ func addItem(c echo.Context) error {
 	defer statement.Close()
 
 	//Getting the id corresponding to the category that was given
-	var categoryID int
+	var categoryID int64
 	err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
 	if err != nil {
 		fmt.Println("This category does not exist")
-		addCategory(category)
-		err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
+		newCategoryID, err := addCategory(category)
 		if err != nil {
 			log.Fatal(err)
 		}
+		categoryID = newCategoryID
 	}
 
 	//Execute the INSERT statement with the values
@@ -154,25 +157,29 @@ func addItem(c echo.Context) error {
 }
 
 //addCategory is called when there is no Category when creating a new item
-func addCategory(category string) {
+func addCategory(category string) (int64, error) {
 	prepareDB()
 	database, err := sql.Open("sqlite3", "mercari.db")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//Insert the data into the database
-	statement, err := database.Prepare("INSERT INTO `Category` (`name`) VALUES (?);")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer statement.Close()
+	// Close the database connection at the end of the function
+	defer database.Close()
 
-	//Execute the INSERT statement with the values
-	_, err = statement.Exec(category)
+	// Execute the INSERT statement
+	result, err := database.Exec("INSERT INTO Category (name) VALUES (?)", category)
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
+
+	// Retrieve the inserted category's ID
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func getImg(c echo.Context) error {
@@ -212,6 +219,8 @@ func getItem(c echo.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	defer database.Close()
 
 	//Prepare the query
 	query := `SELECT Items.name, Category.name, Items.image_filename
