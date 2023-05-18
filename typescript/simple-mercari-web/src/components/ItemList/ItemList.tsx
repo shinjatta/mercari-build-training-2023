@@ -18,16 +18,16 @@ interface Prop {
 export const ItemList: React.FC<Prop> = (props) => {
   const { reload = true, onLoadCompleted } = props;
   const [items, setItems] = useState<Item[]>([])
+
   const fetchItems = () => {
-    fetch(server.concat('/items'),
-      {
-        method: 'GET',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-      })
+    fetch(server.concat('/items'), {
+      method: 'GET',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+    })
       .then(response => response.json())
       .then(data => {
         console.log('GET success:', data);
@@ -46,20 +46,23 @@ export const ItemList: React.FC<Prop> = (props) => {
   }, [reload]);
 
   return (
-    <div>
-      {items.map((item) => {
-        return (
-          <div key={item.id} className='ItemList'>
-            {/* TODO: Task 1: Replace the placeholder image with the item image */}
-            <img src={placeholderImage} />
-            <p>
-              <span>Name: {item.name}</span>
-              <br />
-              <span>Category: {item.category}</span>
-            </p>
-          </div>
-        )
-      })}
+    <div className='ItemListGrid'>
+      <div className='Grid'>
+        {items && items.map((item) => {
+          const imageURL = server.concat('/images/', item.image_filename);
+          return (
+            <div key={item.id} className='ItemList'>
+              {/* TODO: Task 1: Replace the placeholder image with the item image */}
+              <img src={imageURL} alt={item.name} />
+              <div className="ItemDescriptions">
+                <span className="ItemName">{item.name}</span>
+                <span className="ItemCategory">{item.category}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
-  )
+  );
+  
 };

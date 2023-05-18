@@ -22,6 +22,7 @@ const (
 
 //Item represents new object item
 type Item struct {
+	Id       int    `json:"id"`
 	Name     string `json:"name"`
 	Category string `json:"category"`
 	Image    string `json:"image"`
@@ -69,7 +70,7 @@ func dbData() ([]Item, error) {
 		log.Fatal(err)
 	}
 	//Query to get the information from both the Category table and the Items table
-	rows, err := d.Query(`SELECT Items.name, Category.name, Items.image_filename 
+	rows, err := d.Query(`SELECT Items.id, Items.name, Category.name, Items.image_filename 
 	FROM Items
 	INNER JOIN Category
 	ON Category.id = Items.category_id`)
@@ -84,7 +85,7 @@ func dbData() ([]Item, error) {
 	//Iterate over the results and scan the values in the item structs
 	for rows.Next() {
 		item := Item{}
-		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+		err := rows.Scan(&item.Id, &item.Name, &item.Category, &item.Image)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -223,14 +224,14 @@ func getItem(c echo.Context) error {
 	defer database.Close()
 
 	//Prepare the query
-	query := `SELECT Items.name, Category.name, Items.image_filename
+	query := `SELECT Items.id, Items.name, Category.name, Items.image_filename
           FROM Items
           INNER JOIN Category ON Items.category_id = Category.id
           WHERE Items.id = ?`
 
 	//Getting the item
 	SelectedItem := Item{}
-	err = database.QueryRow(query, idParm).Scan(&SelectedItem.Name, &SelectedItem.Category, &SelectedItem.Image)
+	err = database.QueryRow(query, idParm).Scan(&SelectedItem.Id, &SelectedItem.Name, &SelectedItem.Category, &SelectedItem.Image)
 	if err != nil {
 		res := Response{Message: "Not found"}
 		return c.JSON(http.StatusNotFound, res)
