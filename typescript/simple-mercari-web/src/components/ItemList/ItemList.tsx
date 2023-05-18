@@ -5,7 +5,7 @@ interface Item {
   name: string;
   category: string;
   image: string;
-};
+}
 
 const server = process.env.REACT_APP_API_URL || 'http://127.0.0.1:9000';
 const placeholderImage = process.env.PUBLIC_URL + '/logo192.png';
@@ -17,7 +17,7 @@ interface Prop {
 
 export const ItemList: React.FC<Prop> = (props) => {
   const { reload = true, onLoadCompleted } = props;
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<Item[]>([]);
 
   const fetchItems = () => {
     fetch(server.concat('/items'), {
@@ -36,8 +36,8 @@ export const ItemList: React.FC<Prop> = (props) => {
       })
       .catch(error => {
         console.error('GET error:', error)
-      })
-  }
+      });
+  };
 
   useEffect(() => {
     if (reload) {
@@ -46,21 +46,19 @@ export const ItemList: React.FC<Prop> = (props) => {
   }, [reload]);
 
   return (
-<div>
-            {items.map((item) => {
-                console.log(item.image);
-                return (
-                    <div key={item.id} className='ItemList'>
-                        <img src={"http://localhost:9000/image/"+item.image} height="200" />
-                        <p>
-                            <span>Name: {item.name}</span>
-                            <br />
-                            <span>Category: {item.category}</span>
-                        </p>
-                    </div>
-                )
-            })}
-        </div>
+    <div className="grid-container">
+      {items.map((item, index) => {
+        return (
+          <div key={item.id} className="item">
+            <img src={`${server}/image/${item.image}`} height="200" alt={item.name} />
+            <p>
+              <span>{item.name}</span>
+              <br />
+              <span>Category: {item.category}</span>
+            </p>
+          </div>
+        );
+      })}
+    </div>
   );
-  
 };

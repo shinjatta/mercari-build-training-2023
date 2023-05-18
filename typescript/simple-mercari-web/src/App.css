@@ -1,43 +1,135 @@
+:root {
+  --alias-color-text-primary-default: #333;
+  --alias-color-background-secondary-default: #f5f5f5;
+  --alias-color-border-primary-default: #ccc;
+  --alias-color-border-primary-highlight: #e5e5e5;
+}
+
 .App {
   text-align: center;
 }
 
-.Title {
-  background-color: #222427;
-  min-height: 8vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: left;
-  font-size: calc(10px + 1vmin);
-  color: white;
-}
-
 .Listing {
-  background-color: #222427;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: left;
   font-size: calc(10px + 1vmin);
-  color: white;
+  color: #222427;
+  border-bottom: 1px solid var(--alias-color-border-primary-highlight);
 }
-
 .ItemList {
-  background-color: #222427;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: left;
   font-size: calc(10px + 1vmin);
-  color: white;
+  color: black;
 }
 
 .App-link {
   color: #61dafb;
 }
+
+.button{
+  fill: #fff;
+  background-color: #ff333f;
+  color: #fff;
+  font-size: 14px;
+  height: 36px;
+  min-width: 60px;
+  padding: 8px 16px;
+  justify-content: center;
+  border: none;
+  appearance: none;
+  font-weight: 900;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  border-radius: 10%;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-gap: 16px;
+  margin: 0 40px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  border-radius: 4px;
+  color: var(--alias-color-text-primary-default);
+}
+
+.item img {
+  height: 200px;
+  width: 100%;
+  object-fit: cover;
+}
+
+.item p {
+  margin-top: 8px;
+}
+
+.item span {
+  display: block;
+}
+
+.Title {
+  min-height: 3vh;
+  display: flex;
+  align-items: center;
+  justify-content: left;
+}
+
+#logo{
+  width: 110px;
+  display: block;
+  margin-right: 30px;
+
+}
+
+.Listing form div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.Listing form input,
+.Listing form  {
+  flex: 1;
+  margin-right: 10px;
+}
+
+input{
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0px;
+  padding: 10px 16px;
+  color: var(--alias-color-text-primary-default);
+  font-weight: normal;
+  font-size: 16px;
+  line-height: 1.4em;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px 0px 0px 4px;
+  outline: none;
+  appearance: none;
+  color: var(--alias-color-text-primary-default);
+  background-color: var(--alias-color-background-secondary-default);
+  border: 1px solid var(--alias-color-border-primary-default);
+  border-radius: 4px;
+}
+
 
 @keyframes App-logo-spin {
   from {
