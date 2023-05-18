@@ -198,7 +198,7 @@ func getImg(c echo.Context) error {
 	return c.File(imgPath)
 }
 
-//getAllItems gets all items
+// getAllItems gets all items
 func getAllItems(c echo.Context) error {
 	prepareDB()
 	items, err := dbData()
@@ -206,7 +206,10 @@ func getAllItems(c echo.Context) error {
 		res := Response{Message: "Not found"}
 		return c.JSON(http.StatusNotFound, res)
 	}
-	return c.JSON(http.StatusOK, items)
+
+	// Wrap the items in the expected response structure
+	response := Items{Items: items}
+	return c.JSON(http.StatusOK, response)
 }
 
 //getItem gets the item with the specified id
