@@ -2,6 +2,10 @@
 
 This is @shinjatta's build training repository.
 
+**Preview**
+
+![Example image](https://github.com/shinjatta/mercari-build-training-2023/blob/main/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202023-05-18%2023.14.47.png)
+
 Build trainingの前半では個人で課題に取り組んでもらい、Web開発の基礎知識をつけていただきます。
 ドキュメントには詳細なやり方は記載しません。自身で検索したり、リファレンスを確認したり、チームメイトと協力して各課題をクリアしましょう。
 
