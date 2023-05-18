@@ -106,15 +106,32 @@ func addItem(c echo.Context) error {
 	//Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
-	imagePath := c.FormValue("image")
-	//Read the data of the image
-	imageData, err := ioutil.ReadFile(imagePath)
+	imagePath, err := c.FormFile("image")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
+	}
+	//TODO: Investigate how to copy the file io.copy
+	imageItself, err := imagePath.Open()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Read the data of the image
+	imageData, err := ioutil.ReadAll(imageItself)
+	if err != nil {
+		log.Fatal("imagePath: ", imagePath, "Error: ", err)
 	}
 
 	//Create new image name with sha256
 	newImageName := fmt.Sprintf("%x%s", sha256.Sum256(imageData), ".jpg")
+
+	// Create image path
+	imgPath := path.Join(ImgDir, newImageName)
+
+	err = ioutil.WriteFile(imgPath, imageData, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//Message
 	c.Logger().Infof("We recived a %s from category: %s", name, category)
@@ -192,9 +209,10 @@ func getImg(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 	if _, err := os.Stat(imgPath); err != nil {
-		c.Logger().Debugf("Image not found: %s", imgPath)
+		c.Logger().Debugf("Image not found: %s, %v", imgPath, err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
+	c.Logger().Debugf(imgPath)
 	return c.File(imgPath)
 }
 
@@ -249,7 +267,7 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Logger.SetLevel(log.INFO)
+	e.Logger.SetLevel(log.DEBUG)
 
 	front_url := os.Getenv("FRONT_URL")
 	if front_url == "" {
