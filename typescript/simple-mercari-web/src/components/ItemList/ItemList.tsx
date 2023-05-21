@@ -50,11 +50,11 @@ export const ItemList: React.FC<Prop> = (props) => {
       {items.map((item, index) => {
         return (
           <div key={item.id} className="item">
-            <img src={`${server}/image/${item.image}`} height="200" alt={item.name} />
+            <img src={`${server}/image/${item.image}`} alt={item.name} />
             <p>
               <span>{item.name}</span>
               <br />
-              <span>Category: {item.category}</span>
+              <span className='categoryName'>{item.category}</span>
             </p>
           </div>
         );

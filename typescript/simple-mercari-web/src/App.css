@@ -19,15 +19,6 @@
   color: #222427;
   border-bottom: 1px solid var(--alias-color-border-primary-highlight);
 }
-.ItemList {
-  min-height: 8vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: left;
-  font-size: calc(10px + 1vmin);
-  color: black;
-}
 
 .App-link {
   color: #61dafb;
@@ -90,11 +81,27 @@
   justify-content: left;
 }
 
-#logo{
+.logo{
   width: 110px;
   display: block;
   margin-right: 30px;
 
+}
+
+.categoryName{
+  font-size: 12px;
+}
+
+.item span {
+  display: contents;
+}
+
+.grid-container{
+  margin-top: 3%;
+}
+
+div.item:hover{
+  background-color: var(--alias-color-border-primary-highlight) ;
 }
 
 .Listing form div {
@@ -109,7 +116,7 @@
   margin-right: 10px;
 }
 
-input{
+.input{
   box-sizing: border-box;
   width: 100%;
   height: 100%;

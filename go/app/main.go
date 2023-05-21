@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -103,39 +103,50 @@ func root(c echo.Context) error {
 
 //addItem adds a new item and if there is not the category given, creates a new one
 func addItem(c echo.Context) error {
-	//Get form data
+	// Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
 	imagePath, err := c.FormFile("image")
 	if err != nil {
-		log.Fatal(err)
-	}
-	//TODO: Investigate how to copy the file io.copy
-	imageItself, err := imagePath.Open()
-	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Invalid parameter: %v", err)
 	}
 
-	//Read the data of the image
-	imageData, err := ioutil.ReadAll(imageItself)
+	// Open the uploaded image file
+	imageFile, err := imagePath.Open()
 	if err != nil {
-		log.Fatal("imagePath: ", imagePath, "Error: ", err)
+		return fmt.Errorf("Failed to open image: %v", err)
+	}
+	defer imageFile.Close()
+
+	// Create a new image file
+	imageDataPath := path.Join(ImgDir, imagePath.Filename)
+	newFile, err := os.Create(imageDataPath)
+	if err != nil {
+		return fmt.Errorf("Failed to create image file: %v", err)
+	}
+	defer newFile.Close()
+
+	// Copy the image data to the new file
+	_, err = io.Copy(newFile, imageFile)
+	if err != nil {
+		return fmt.Errorf("Failed to copy image data: %v", err)
 	}
 
-	//Create new image name with sha256
-	newImageName := fmt.Sprintf("%x%s", sha256.Sum256(imageData), ".jpg")
+	// Create a new image name with sha256
+	newImageName := fmt.Sprintf("%x%s", sha256.Sum256([]byte(imagePath.Filename)), ".jpg")
 
 	// Create image path
 	imgPath := path.Join(ImgDir, newImageName)
 
-	err = ioutil.WriteFile(imgPath, imageData, 0644)
+	// Rename the image file with the new name
+	err = os.Rename(imageDataPath, imgPath)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Failed to rename image file: %v", err)
 	}
 
-	//Message
-	c.Logger().Infof("We recived a %s from category: %s", name, category)
-	message := fmt.Sprintf("We recived a %s from category: %s", name, category)
+	// Message
+	c.Logger().Infof("We received a %s from category: %s", name, category)
+	message := fmt.Sprintf("We received a %s from category: %s", name, category)
 	res := Response{Message: message}
 
 	prepareDB()
@@ -143,17 +154,16 @@ func addItem(c echo.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer database.Close()
 
-	//Insert the data into the database
+	// Insert the data into the database
 	statement, err := database.Prepare("INSERT INTO `Items` (`name`, `category_id`, `image_filename`) VALUES (?, ?, ?);")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer statement.Close()
 
-	//Getting the id corresponding to the category that was given
+	// Get the ID corresponding to the category that was given
 	var categoryID int64
 	err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
 	if err != nil {
@@ -165,7 +175,7 @@ func addItem(c echo.Context) error {
 		categoryID = newCategoryID
 	}
 
-	//Execute the INSERT statement with the values
+	// Execute the INSERT statement with the values
 	_, err = statement.Exec(name, categoryID, newImageName)
 	if err != nil {
 		log.Fatal(err)
