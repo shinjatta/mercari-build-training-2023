@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -22,6 +22,7 @@ const (
 
 //Item represents new object item
 type Item struct {
+	Id       int    `json:"id"`
 	Name     string `json:"name"`
 	Category string `json:"category"`
 	Image    string `json:"image"`
@@ -69,7 +70,7 @@ func dbData() ([]Item, error) {
 		log.Fatal(err)
 	}
 	//Query to get the information from both the Category table and the Items table
-	rows, err := d.Query(`SELECT Items.name, Category.name, Items.image_filename 
+	rows, err := d.Query(`SELECT Items.id, Items.name, Category.name, Items.image_filename 
 	FROM Items
 	INNER JOIN Category
 	ON Category.id = Items.category_id`)
@@ -84,7 +85,7 @@ func dbData() ([]Item, error) {
 	//Iterate over the results and scan the values in the item structs
 	for rows.Next() {
 		item := Item{}
-		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+		err := rows.Scan(&item.Id, &item.Name, &item.Category, &item.Image)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -102,22 +103,50 @@ func root(c echo.Context) error {
 
 //addItem adds a new item and if there is not the category given, creates a new one
 func addItem(c echo.Context) error {
-	//Get form data
+	// Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
-	imagePath := c.FormValue("image")
-	//Read the data of the image
-	imageData, err := ioutil.ReadFile(imagePath)
+	imagePath, err := c.FormFile("image")
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("Invalid parameter: %v", err)
 	}
 
-	//Create new image name with sha256
-	newImageName := fmt.Sprintf("%x%s", sha256.Sum256(imageData), ".jpg")
+	// Open the uploaded image file
+	imageFile, err := imagePath.Open()
+	if err != nil {
+		return fmt.Errorf("Failed to open image: %v", err)
+	}
+	defer imageFile.Close()
 
-	//Message
-	c.Logger().Infof("We recived a %s from category: %s", name, category)
-	message := fmt.Sprintf("We recived a %s from category: %s", name, category)
+	// Create a new image file
+	imageDataPath := path.Join(ImgDir, imagePath.Filename)
+	newFile, err := os.Create(imageDataPath)
+	if err != nil {
+		return fmt.Errorf("Failed to create image file: %v", err)
+	}
+	defer newFile.Close()
+
+	// Copy the image data to the new file
+	_, err = io.Copy(newFile, imageFile)
+	if err != nil {
+		return fmt.Errorf("Failed to copy image data: %v", err)
+	}
+
+	// Create a new image name with sha256
+	newImageName := fmt.Sprintf("%x%s", sha256.Sum256([]byte(imagePath.Filename)), ".jpg")
+
+	// Create image path
+	imgPath := path.Join(ImgDir, newImageName)
+
+	// Rename the image file with the new name
+	err = os.Rename(imageDataPath, imgPath)
+	if err != nil {
+		return fmt.Errorf("Failed to rename image file: %v", err)
+	}
+
+	// Message
+	c.Logger().Infof("We received a %s from category: %s", name, category)
+	message := fmt.Sprintf("We received a %s from category: %s", name, category)
 	res := Response{Message: message}
 
 	prepareDB()
@@ -125,17 +154,16 @@ func addItem(c echo.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer database.Close()
 
-	//Insert the data into the database
+	// Insert the data into the database
 	statement, err := database.Prepare("INSERT INTO `Items` (`name`, `category_id`, `image_filename`) VALUES (?, ?, ?);")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer statement.Close()
 
-	//Getting the id corresponding to the category that was given
+	// Get the ID corresponding to the category that was given
 	var categoryID int64
 	err = database.QueryRow("SELECT id FROM Category WHERE name = ?", category).Scan(&categoryID)
 	if err != nil {
@@ -147,7 +175,7 @@ func addItem(c echo.Context) error {
 		categoryID = newCategoryID
 	}
 
-	//Execute the INSERT statement with the values
+	// Execute the INSERT statement with the values
 	_, err = statement.Exec(name, categoryID, newImageName)
 	if err != nil {
 		log.Fatal(err)
@@ -191,13 +219,14 @@ func getImg(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 	if _, err := os.Stat(imgPath); err != nil {
-		c.Logger().Debugf("Image not found: %s", imgPath)
+		c.Logger().Debugf("Image not found: %s, %v", imgPath, err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
+	c.Logger().Debugf(imgPath)
 	return c.File(imgPath)
 }
 
-//getAllItems gets all items
+// getAllItems gets all items
 func getAllItems(c echo.Context) error {
 	prepareDB()
 	items, err := dbData()
@@ -205,7 +234,10 @@ func getAllItems(c echo.Context) error {
 		res := Response{Message: "Not found"}
 		return c.JSON(http.StatusNotFound, res)
 	}
-	return c.JSON(http.StatusOK, items)
+
+	// Wrap the items in the expected response structure
+	response := Items{Items: items}
+	return c.JSON(http.StatusOK, response)
 }
 
 //getItem gets the item with the specified id
@@ -223,14 +255,14 @@ func getItem(c echo.Context) error {
 	defer database.Close()
 
 	//Prepare the query
-	query := `SELECT Items.name, Category.name, Items.image_filename
+	query := `SELECT Items.id, Items.name, Category.name, Items.image_filename
           FROM Items
           INNER JOIN Category ON Items.category_id = Category.id
           WHERE Items.id = ?`
 
 	//Getting the item
 	SelectedItem := Item{}
-	err = database.QueryRow(query, idParm).Scan(&SelectedItem.Name, &SelectedItem.Category, &SelectedItem.Image)
+	err = database.QueryRow(query, idParm).Scan(&SelectedItem.Id, &SelectedItem.Name, &SelectedItem.Category, &SelectedItem.Image)
 	if err != nil {
 		res := Response{Message: "Not found"}
 		return c.JSON(http.StatusNotFound, res)
@@ -245,7 +277,7 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Logger.SetLevel(log.INFO)
+	e.Logger.SetLevel(log.DEBUG)
 
 	front_url := os.Getenv("FRONT_URL")
 	if front_url == "" {

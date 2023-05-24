@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logo from '../../logo.png';
 
 const server = process.env.REACT_APP_API_URL || 'http://127.0.0.1:9000';
 
@@ -55,10 +56,11 @@ export const Listing: React.FC<Prop> = (props) => {
     <div className='Listing'>
       <form onSubmit={onSubmit}>
         <div>
-          <input type='text' name='name' id='name' placeholder='name' onChange={onValueChange} required />
-          <input type='text' name='category' id='category' placeholder='category' onChange={onValueChange} />
-          <input type='file' name='image' id='image' onChange={onFileChange} required />
-          <button type='submit'>List this item</button>
+          <img className="logo" src={logo} alt="Logo" />
+          <input className="input" type='text' name='name' id='name' placeholder='商品の名前' onChange={onValueChange} required />
+          <input className="input" type='text' name='category' id='category' placeholder='商品は何ですか' onChange={onValueChange} />
+          <input className="input" type='file' name='image' id='image' onChange={onFileChange} required />
+          <button className="button" type='submit'>出品</button>
         </div>
       </form>
     </div>
